@@ -56,7 +56,7 @@ DETECTION_MODE = "detect"
 CLASS_NAMES = ["product"]
 
 # ── Training ─────────────────────────────────────────────────────────────────
-EPOCHS      = 10
+EPOCHS      = 30
 BATCH_SIZE  = 4            # safe starting batch size for lower-memory GPUs
 IMG_SIZE    = 640
 # Auto-select the available device backend.
