@@ -1,0 +1,25 @@
+ultralytics>=8.2.0
+# For GPU training, install a PyTorch wheel matching your platform and backend.
+# Example: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# On Apple silicon you may use MPS-enabled builds; on AMD/ROCm use ROCm-enabled builds.
+torch>=2.0.0
+torchvision>=0.15.0
+opencv-python>=4.8.0
+fastapi>=0.110.0
+uvicorn>=0.29.0
+streamlit>=1.33.0
+plotly>=5.20.0
+Pillow>=10.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+PyYAML>=6.0
+requests>=2.31.0
+python-multipart>=0.0.9
+
+# Analytics
+easyocr>=1.7.0
+scikit-learn>=1.3.0
+
+# Live camera
+streamlit-webrtc>=0.47.0
+av>=10.0.0

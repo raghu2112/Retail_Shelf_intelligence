@@ -1,0 +1,27 @@
+# docker-compose.yml
+#
+# Easier way to run the container with correct volume mounts.
+#
+# USAGE:
+#   docker compose up --build
+#
+# To rebuild after code changes:
+#   docker compose up --build --force-recreate
+
+version: "3.9"
+
+services:
+  retail-shelf:
+    build: .
+    container_name: retail-shelf-intelligence
+    ports:
+      - "8000:8000"   # FastAPI
+      - "8501:8501"   # Streamlit
+    volumes:
+      # Mount data and models so they persist between container restarts
+      # and so you can add new images without rebuilding
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
