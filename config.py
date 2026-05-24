@@ -62,8 +62,8 @@ CLASS_NAMES = ["product"]
 # ── Training ─────────────────────────────────────────────────────────────────
 # ACCURACY TIP: Increase EPOCHS to 100 or 150. YOLOv8 has built-in early stopping
 # (patience parameter), so it will train until it stops improving automatically.
-EPOCHS = 40
-BATCH_SIZE = 16            # safe for 4GB RTX 2050 (use 4 for low VRAM)
+EPOCHS = 30
+BATCH_SIZE = 8            # safe for 4GB RTX 2050 (use 4 for low VRAM)
 
 # ACCURACY TIP: Set IMG_SIZE to 640 or 1024. Shelf images contain many small products,
 # and higher input resolution directly prevents small items from becoming blurry.
@@ -73,7 +73,7 @@ IMG_SIZE = 640
 # Adjust batch size down if your GPU has limited VRAM.
 DEVICE = _preferred_device()
 # 4-8 workers is a safe laptop-friendly value for data loading
-WORKERS = 8
+WORKERS = 4
 
 # ── Inference ────────────────────────────────────────────────────────────────
 CONFIDENCE_THRESHOLD = 0.35
