@@ -139,6 +139,11 @@ class AnomalyDetector:
         for d in all_detections:
             by_class.setdefault(d.class_name, []).append(d)
 
+        # In a single-class setup (where all items are labeled "product"),
+        # centroid-based clustering is not meaningful and creates false alerts.
+        if len(by_class) <= 1:
+            return []
+
         threshold_px = stats.image_width * 0.60  # 60% of image width
 
         max_misplaced = 5  # Only report the worst offenders

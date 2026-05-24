@@ -7,20 +7,21 @@ import os
 # ── Root paths ──────────────────────────────────────────────────────────────
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATA_DIR          = os.path.join(ROOT_DIR, "data")
-RAW_DIR           = os.path.join(DATA_DIR, "raw")
-PROCESSED_DIR     = os.path.join(DATA_DIR, "processed")
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+RAW_DIR = os.path.join(DATA_DIR, "raw")
+PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
 REPLAY_BUFFER_DIR = os.path.join(DATA_DIR, "replay_buffer")
 
-MODELS_DIR      = os.path.join(ROOT_DIR, "models")
+MODELS_DIR = os.path.join(ROOT_DIR, "models")
 CHECKPOINTS_DIR = os.path.join(MODELS_DIR, "checkpoints")
-CONFIGS_DIR     = os.path.join(MODELS_DIR, "configs")
+CONFIGS_DIR = os.path.join(MODELS_DIR, "configs")
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
-DATASET_YAML = os.path.join(CONFIGS_DIR, "sku110k.yaml")
+DATASET_YAML = os.path.join(CONFIGS_DIR, "data_kaggle.yaml")
+
 
 # How many images to use for quick experiments (set None to use all)
-SUBSET_SIZE = 100
+SUBSET_SIZE = None
 
 # Train / val split ratio
 TRAIN_RATIO = 0.80
@@ -45,8 +46,11 @@ def _preferred_device() -> str:
 # ── Model ────────────────────────────────────────────────────────────────────
 # Model variants: "yolov8n.pt" (nano), "yolov8s.pt" (small), "yolov8m.pt" (medium)
 # Segmentation:   "yolov8s-seg.pt", "yolov8m-seg.pt"
-MODEL_NAME    = "yolov8s.pt"     # upgraded from nano to small for better accuracy
-BEST_WEIGHTS  = os.path.join(CHECKPOINTS_DIR, "best.pt")
+#
+# ACCURACY TIP: Upgrade to "yolov8m.pt" (medium) or "yolov8l.pt" (large) to capture
+# finer product features and improve detection rate on crowded shelves.
+MODEL_NAME = "yolov8s.pt"     # upgraded from nano to small for better accuracy
+BEST_WEIGHTS = os.path.join(CHECKPOINTS_DIR, "best.pt")
 
 # Detection mode: "detect" or "segment"
 DETECTION_MODE = "detect"
@@ -56,23 +60,27 @@ DETECTION_MODE = "detect"
 CLASS_NAMES = ["product"]
 
 # ── Training ─────────────────────────────────────────────────────────────────
-EPOCHS      = 10
-BATCH_SIZE  = 4            # safe starting batch size for lower-memory GPUs
-IMG_SIZE    = 640
-# Auto-select the available device backend.
-# Supports CUDA for NVIDIA, MPS for Apple, or CPU when no GPU backend is available.
-# Adjust batch size down if your GPU has limited VRAM.
-DEVICE      = _preferred_device()
-WORKERS     = 4            # more workers speeds up data loading on multi-core systems
+# ACCURACY TIP: Increase EPOCHS to 100 or 150. YOLOv8 has built-in early stopping
+# (patience parameter), so it will train until it stops improving automatically.
+EPOCHS = 40
+BATCH_SIZE = 16            # safe for 4GB RTX 2050
+
+# ACCURACY TIP: Set IMG_SIZE to 640 or 1024. Shelf images contain many small products,
+# and higher input resolution directly prevents small items from becoming blurry.
+IMG_SIZE = 512
+# Use CUDA directly for faster training on your RTX 2050
+DEVICE = _preferred_device()
+# 4 workers is a safer laptop-friendly value for data loading
+WORKERS = 8
 
 # ── Inference ────────────────────────────────────────────────────────────────
 CONFIDENCE_THRESHOLD = 0.35
-IOU_THRESHOLD        = 0.45
+IOU_THRESHOLD = 0.45
 
 # ── Anomaly detection thresholds ─────────────────────────────────────────────
-EMPTY_SHELF_MAX_PRODUCTS    = 2
-LOW_STOCK_MAX_PRODUCTS      = 5
-MISPLACED_IOU_THRESHOLD     = 0.1
+EMPTY_SHELF_MAX_PRODUCTS = 2
+LOW_STOCK_MAX_PRODUCTS = 5
+MISPLACED_IOU_THRESHOLD = 0.1
 
 # ML anomaly detection
 ANOMALY_CONTAMINATION = 0.1     # expected proportion of anomalous samples
@@ -80,12 +88,12 @@ ANOMALY_FEATURES = ["total_products", "avg_confidence", "detection_density",
                     "zone_variance", "max_zone_gap"]
 
 # ── OCR ──────────────────────────────────────────────────────────────────────
-OCR_ENABLED    = True
-OCR_LANGUAGES  = ["en"]
+OCR_ENABLED = True
+OCR_LANGUAGES = ["en"]
 OCR_CONFIDENCE = 0.4            # minimum OCR confidence to keep a text detection
 
 # ── Heatmap ──────────────────────────────────────────────────────────────────
-HEATMAP_RADIUS    = 40          # Gaussian blur radius for heatmap
+HEATMAP_RADIUS = 40          # Gaussian blur radius for heatmap
 HEATMAP_INTENSITY = 0.6         # overlay opacity (0=transparent, 1=opaque)
 
 # ── Live camera ──────────────────────────────────────────────────────────────
@@ -93,21 +101,21 @@ CAMERA_INTERVAL_SEC = 5         # seconds between auto-captures from live feed
 
 # ── Continual learning ────────────────────────────────────────────────────────
 REPLAY_BUFFER_MAX_SIZE = 200
-REPLAY_SAMPLE_SIZE     = 50
-CL_EPOCHS              = 10
+REPLAY_SAMPLE_SIZE = 50
+CL_EPOCHS = 10
 
 # EWC (Elastic Weight Consolidation)
-EWC_LAMBDA    = 5000            # importance weight for EWC penalty
+EWC_LAMBDA = 5000            # importance weight for EWC penalty
 EWC_N_SAMPLES = 100             # samples used to estimate Fisher information
 
 # Active learning
 AL_UNCERTAINTY_METHOD = "entropy"  # "entropy", "margin", "least_confident"
-AL_POOL_SIZE          = 200        # unlabeled pool size to evaluate
-AL_QUERY_SIZE         = 20         # how many images to select per round
+AL_POOL_SIZE = 200        # unlabeled pool size to evaluate
+AL_QUERY_SIZE = 20         # how many images to select per round
 
 # ── Async inference ──────────────────────────────────────────────────────────
-MAX_QUEUE_SIZE    = 50          # max pending inference jobs
-ASYNC_WORKERS     = 2           # number of background inference workers
+MAX_QUEUE_SIZE = 50          # max pending inference jobs
+ASYNC_WORKERS = 2           # number of background inference workers
 
 # ── API ───────────────────────────────────────────────────────────────────────
 API_HOST = "0.0.0.0"

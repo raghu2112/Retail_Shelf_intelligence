@@ -13,6 +13,9 @@
 #   models/checkpoints/last.pt   ← last epoch weights
 #   runs/detect/train*/          ← training logs, plots (created by ultralytics)
 
+from ultralytics import YOLO
+import torch
+import config as cfg
 import os
 import sys
 from pathlib import Path
@@ -20,17 +23,25 @@ from pathlib import Path
 # Make sure project root is on path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import config as cfg
-import torch
 _original_load = torch.load
+
+
 def _safe_load(*args, **kwargs):
     kwargs['weights_only'] = False
     return _original_load(*args, **kwargs)
+
+
 torch.load = _safe_load
-from ultralytics import YOLO
 
 
 def train():
+    # ACCURACY TIPS:
+    # 1. RESOLUTION: Increase IMG_SIZE in config.py to 640 or 1024. Shelf images have 
+    #    tiny products, and higher resolutions directly improve mAP for small bboxes.
+    # 2. EPOCHS: Train for 100-150 epochs. YOLOv8 uses early stopping, so it stops 
+    #    automatically when learning plateaus.
+    # 3. ACTIVE LEARNING: Use active_learning.py to retrieve highly uncertain shelf 
+    #    images, annotate them, and add them back to your training dataset.
     print("=" * 60)
     print("YOLOv8 Training — Retail Shelf Detection")
     print("=" * 60)
@@ -42,7 +53,8 @@ def train():
     print(f"  Config device: {cfg.DEVICE}")
 
     cuda_available = torch.cuda.is_available()
-    mps_available = getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
+    mps_available = getattr(
+        torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
     device = cfg.DEVICE
     if device == "cuda" and not cuda_available:
         print("  [WARNING] CUDA requested but not available. Falling back to CPU.")
@@ -57,7 +69,8 @@ def train():
         print("  MPS backend available. Using Apple GPU.")
     else:
         if cuda_available or mps_available:
-            print("  A GPU backend is available, but using CPU because cfg.DEVICE is set to 'cpu'.")
+            print(
+                "  A GPU backend is available, but using CPU because cfg.DEVICE is set to 'cpu'.")
         else:
             print("  No GPU backend is available. Using CPU.")
     print(f"  Device:     {device}")
@@ -70,39 +83,54 @@ def train():
         print("  python -m src.utils.prepare_dataset")
         return
 
-    # Load the model
-    # YOLOv8n pretrained on COCO — we fine-tune it on retail products.
-    # This is transfer learning: the backbone already knows how to detect
-    # objects; we just teach it what retail shelf objects look like.
-    model = YOLO(cfg.MODEL_NAME)
+    # Check if resuming from checkpoint
+    last_checkpoint = os.path.join(
+        cfg.CHECKPOINTS_DIR, "train", "weights", "last.pt")
+    resume = False
+    if os.path.exists(last_checkpoint):
+        print(f"  Resuming from checkpoint: {last_checkpoint}")
+        model = YOLO(last_checkpoint)
+        resume = True
+    else:
+        print(f"  Starting fresh training")
+        # YOLOv8n pretrained on COCO — we fine-tune it on retail products.
+        # This is transfer learning: the backbone already knows how to detect
+        # objects; we just teach it what retail shelf objects look like.
+        model = YOLO(cfg.MODEL_NAME)
 
     # Train
     results = model.train(
-        data      = cfg.DATASET_YAML,
-        epochs    = cfg.EPOCHS,
-        batch     = cfg.BATCH_SIZE,
-        imgsz     = cfg.IMG_SIZE,
-        device    = device,
-        workers   = cfg.WORKERS,
-        project   = cfg.CHECKPOINTS_DIR,
-        name      = "train",
-        exist_ok  = True,       # overwrite previous run folder
-        pretrained= True,       # use COCO weights as starting point
-        patience  = 10,         # stop early if val loss doesn't improve
-        save      = True,
-        plots     = True,       # saves confusion matrix, loss curves etc.
-        verbose   = True,
+        data=cfg.DATASET_YAML,
+        epochs=cfg.EPOCHS,
+        batch=cfg.BATCH_SIZE,
+        imgsz=cfg.IMG_SIZE,
+        device=device,
+        workers=cfg.WORKERS,
+        project=cfg.CHECKPOINTS_DIR,
+        name="train",
+        exist_ok=True,       # overwrite previous run folder
+        # only use pretrained weights if starting fresh
+        pretrained=True if not resume else False,
+        resume=resume,     # resume from checkpoint if available
+        patience=10,         # stop early if val loss doesn't improve
+        save=True,
+        plots=True,       # saves confusion matrix, loss curves etc.
+        verbose=True,
 
-        # CPU-specific: disable mixed precision (only helps on GPU)
-        amp       = False,
+        # Enable mixed precision on GPU for better throughput
+        amp=(device == "cuda"),
+        # Faster data transfer to GPU
+        half=(device == "cuda"),
+        # 12GB RAM: cache images from epoch 2+ for faster training
+        cache=(device == "cuda"),
 
         # Data augmentation — helps a lot with small datasets
-        flipud    = 0.0,
-        fliplr    = 0.5,
-        mosaic    = 0.5,        # mosaic augmentation (4 images combined)
-        degrees   = 5.0,        # small rotation
-        translate = 0.1,
-        scale     = 0.3,
+        flipud=0.0,
+        fliplr=0.5,
+        mosaic=0.5,        # mosaic augmentation (4 images combined)
+        degrees=5.0,        # small rotation
+        translate=0.1,
+        scale=0.3,
     )
 
     # Copy best weights to our standard location
@@ -118,7 +146,8 @@ def train():
     # Print summary
     print("\n" + "=" * 60)
     print("Training complete.")
-    print(f"Best mAP50: {results.results_dict.get('metrics/mAP50(B)', 'N/A'):.4f}")
+    print(
+        f"Best mAP50: {results.results_dict.get('metrics/mAP50(B)', 'N/A'):.4f}")
     print(f"Weights → {cfg.BEST_WEIGHTS}")
     print("=" * 60)
     print("\nNext step: test inference with:")

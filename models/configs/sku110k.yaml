@@ -1,0 +1,6 @@
+names:
+- product
+nc: 1
+path: F:\retail_shelf_intelligence\data\processed
+train: images/train
+val: images/val

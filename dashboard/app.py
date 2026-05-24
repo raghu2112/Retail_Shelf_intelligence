@@ -205,7 +205,7 @@ def render_shelf_share(data: dict):
         # Occupancy gauge
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
-            value=share.occupancy_rate * 100,
+            value=round(share.occupancy_rate * 100, 1),
             title={"text": "Shelf Occupancy"},
             number={"suffix": "%"},
             gauge={

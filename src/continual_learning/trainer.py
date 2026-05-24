@@ -38,6 +38,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config as cfg
 from src.continual_learning.replay_buffer import ReplayBuffer
 
+# Torch safe load patch to avoid weights_only issues on PyTorch 2.6+ / 2.12+
+import torch
+_original_load = torch.load
+def _safe_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return _original_load(*args, **kwargs)
+torch.load = _safe_load
+
 
 class IncrementalTrainer:
     """
@@ -183,7 +191,7 @@ class IncrementalTrainer:
                 name      = "finetune",
                 exist_ok  = True,
                 pretrained= False,  # we're starting FROM our weights, not COCO
-                amp       = False,
+                amp       = (cfg.DEVICE == "cuda"),  # mixed precision on GPU
                 lr0       = 0.001,  # lower LR for fine-tuning (don't destroy old weights)
                 lrf       = 0.01,
                 freeze    = 10,     # freeze first 10 backbone layers to preserve features

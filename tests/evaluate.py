@@ -29,6 +29,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import config as cfg
 
+# Torch safe load patch to avoid weights_only issues on PyTorch 2.6+ / 2.12+
+import torch
+_original_load = torch.load
+def _safe_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return _original_load(*args, **kwargs)
+torch.load = _safe_load
+
 
 def evaluate_model(weights_path: str, dataset_yaml: str = None) -> dict:
     """

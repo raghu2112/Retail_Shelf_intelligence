@@ -22,6 +22,7 @@
 #       labels/val/
 #   models/configs/sku110k.yaml
 
+import config as cfg
 import os
 import shutil
 import random
@@ -33,7 +34,6 @@ import yaml
 # Add project root to path so config imports work
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import config as cfg
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,8 +72,8 @@ def xyxy_to_yolo(x1, y1, x2, y2, img_w, img_h) -> tuple:
     """
     cx = ((x1 + x2) / 2) / img_w
     cy = ((y1 + y2) / 2) / img_h
-    w  = (x2 - x1) / img_w
-    h  = (y2 - y1) / img_h
+    w = (x2 - x1) / img_w
+    h = (y2 - y1) / img_h
     # Clamp to valid range (some annotations have tiny float errors)
     cx, cy, w, h = (max(0.0, min(1.0, v)) for v in (cx, cy, w, h))
     return cx, cy, w, h
@@ -136,7 +136,8 @@ def process_split(
     for img_name in tqdm(available, desc=f"  {split_name}"):
         src_img = os.path.join(raw_images_dir, img_name)
         dst_img = os.path.join(out_images_dir, img_name)
-        dst_lbl = os.path.join(out_labels_dir, img_name.rsplit(".", 1)[0] + ".txt")
+        dst_lbl = os.path.join(
+            out_labels_dir, img_name.rsplit(".", 1)[0] + ".txt")
 
         # Copy image
         shutil.copy2(src_img, dst_img)
@@ -174,8 +175,31 @@ def main():
     print("SKU-110K → YOLOv8 Dataset Preparation")
     print("=" * 60)
 
-    # ── Validate raw data exists ──────────────────────────────────────────────
-    raw_images_root  = os.path.join(cfg.RAW_DIR, "images")
+    # ── Quick path: detect Kaggle YOLO export (SKU110K_fixed)
+    # This export already contains YOLO-format `images/` and `labels/` folders.
+    kaggle_candidates = [
+        os.path.join(cfg.ROOT_DIR, "SKU110K_fixed"),
+        os.path.join(cfg.DATA_DIR, "SKU110K_fixed"),
+        os.path.join(cfg.RAW_DIR, "SKU110K_fixed"),
+    ]
+    for kd in kaggle_candidates:
+        if os.path.exists(kd):
+            print(f"\n[INFO] Found Kaggle SKU-110K export at: {kd}")
+            img_train = os.path.join(kd, "images", "train")
+            lbl_train = os.path.join(kd, "labels", "train")
+            if os.path.exists(img_train) and os.path.exists(lbl_train):
+                # Write dataset YAML that points to the existing folder (no copy)
+                class_names = ["product"]
+                write_dataset_yaml(cfg.DATASET_YAML, kd, class_names)
+                print(
+                    "\nDataset prepared from Kaggle export.\nNext: run training with `python -m src.detection.train`")
+                return
+            else:
+                print(
+                    f"  [WARN] {kd} missing expected images/labels subfolders; skipping")
+
+    # ── Validate raw data exists (SKU-110K CSV workflow) ──────────────────────
+    raw_images_root = os.path.join(cfg.RAW_DIR, "images")
     annotations_root = os.path.join(cfg.RAW_DIR, "annotations")
 
     if not os.path.exists(raw_images_root):
@@ -203,7 +227,7 @@ def main():
     # 85% of SUBSET_SIZE for train, 15% for val
     if cfg.SUBSET_SIZE:
         train_subset = int(cfg.SUBSET_SIZE * cfg.TRAIN_RATIO)
-        val_subset   = cfg.SUBSET_SIZE - train_subset
+        val_subset = cfg.SUBSET_SIZE - train_subset
     else:
         train_subset = val_subset = None
 
@@ -224,12 +248,12 @@ def main():
 
         subset = train_subset if split_name == "train" else val_subset
         n = process_split(
-            split_name     = split_name,
-            raw_images_dir = paths["images"],
-            annotations    = annotations,
-            out_images_dir = out_images,
-            out_labels_dir = out_labels,
-            subset_size    = subset,
+            split_name=split_name,
+            raw_images_dir=paths["images"],
+            annotations=annotations,
+            out_images_dir=out_images,
+            out_labels_dir=out_labels,
+            subset_size=subset,
         )
         total += n
 

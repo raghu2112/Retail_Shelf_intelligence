@@ -32,6 +32,14 @@ except ImportError:
     raise ImportError("Run: pip install ultralytics")
 
 
+def _get_default_device() -> str:
+    try:
+        import config as cfg
+        return cfg.DEVICE
+    except Exception:
+        return "cpu"
+
+
 @dataclass
 class Detection:
     """Single detected object."""
@@ -135,21 +143,21 @@ class ShelfDetector:
         model_path: str = "yolov8n.pt",
         confidence_threshold: float = 0.25,
         iou_threshold: float = 0.45,
-        device: str = "cpu",
+        device: str = None,
     ):
         """
         Args:
             model_path: Path to .pt weights file, or "yolov8n.pt" to auto-download
             confidence_threshold: Minimum confidence to keep a detection
             iou_threshold: NMS IoU threshold (higher = fewer merged boxes)
-            device: "cpu" or "cuda" or "mps"
+            device: "cpu" or "cuda" or "mps" or None (defaults to config.DEVICE)
         """
         self.model_path = model_path
         self.conf = confidence_threshold
         self.iou  = iou_threshold
-        self.device = device
+        self.device = device or _get_default_device()
 
-        print(f"Loading model: {model_path} on {device}")
+        print(f"Loading model: {model_path} on {self.device}")
         self.model = YOLO(model_path)
         self.class_names: List[str] = list(self.model.names.values())
         print(f"Model loaded. Classes: {self.class_names}")
@@ -340,7 +348,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"Initializing detector with {args.weights}...")
-    detector = ShelfDetector(model_path=args.weights)
+    import config as cfg
+    detector = ShelfDetector(model_path=args.weights, device=cfg.DEVICE)
     print(f"Running detection on {args.image}...")
     
     result, annotated = detector.detect_and_visualize(args.image)

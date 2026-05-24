@@ -106,9 +106,11 @@ def get_ml_anomaly():
     return _state["ml_anomaly"]
 
 def get_product_identifier():
-    if "identifier" not in _state:
+    if "identifier" not in _state or not hasattr(_state["identifier"], "brand_catalog"):
         from src.analytics.product_identifier import ProductIdentifier
-        _state["identifier"] = ProductIdentifier()
+        # Limit max_products on CPU to prevent API read timeouts during OCR
+        max_products = 100 if cfg.DEVICE == "cuda" else 15
+        _state["identifier"] = ProductIdentifier(max_products=max_products)
     return _state["identifier"]
 
 
@@ -415,7 +417,7 @@ async def identify_products(file: UploadFile = File(...)):
 
     data = _run_detection(img_array, file.filename)
 
-    identifier = ProductIdentifier()
+    identifier = get_product_identifier()
     inventory = identifier.identify(img_array, data["detections"])
 
     return {

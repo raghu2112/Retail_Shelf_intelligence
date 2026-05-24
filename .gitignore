@@ -18,9 +18,7 @@ data/raw/
 data/processed/
 data/replay_buffer/
 
-# Models and checkpoints
-models/checkpoints/
-models/configs/*.yaml
+# Models and configs are tracked in git
 
 # Logs and outputs
 *.log

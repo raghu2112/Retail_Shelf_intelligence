@@ -40,10 +40,10 @@ class ShelfOCR:
     to the nearest product bounding box.
     """
 
-    def __init__(self, languages: List[str] = None, gpu: bool = False):
+    def __init__(self, languages: List[str] = None, gpu: bool = None):
         self.languages = languages or cfg.OCR_LANGUAGES
         self._reader = None
-        self._gpu = gpu
+        self._gpu = gpu if gpu is not None else (cfg.DEVICE == "cuda")
 
     @property
     def reader(self):
