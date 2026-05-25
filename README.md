@@ -1,6 +1,6 @@
 # Retail Shelf Intelligence
 
-AI-powered retail shelf monitoring with continual learning.
+AI-powered retail shelf monitoring with continual learning, FastAPI inference, and a Streamlit dashboard.
 
 ---
 
@@ -8,76 +8,162 @@ AI-powered retail shelf monitoring with continual learning.
 
 | Feature | How |
 |---------|-----|
-| Product detection | YOLOv8n fine-tuned on SKU-110K |
+| Product detection | YOLOv8 fine-tuned on SKU-110K data |
 | Product counting | Per-class and per-shelf-zone counts |
-| Anomaly detection | Rule-based (empty shelf, low stock, misplaced) |
-| Continual learning | Experience replay buffer + incremental fine-tuning |
+| Anomaly detection | Rule-based alerts plus optional ML anomaly model |
+| Continual learning | Replay buffer + incremental fine-tuning |
 | API | FastAPI REST endpoints |
-| Dashboard | Streamlit with Plotly charts |
+| Dashboard | Streamlit + Plotly UI |
+| Product identification | OCR-based brand/product name extraction |
+
+---
+
+## Project structure
+
+```text
+Retail_Shelf_intelligence/
+├── config.py
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── README.md
+├── future_upgrades.md
+├── api/
+│   └── main.py
+├── dashboard/
+│   └── app.py
+├── data/
+│   ├── processed/
+│   ├── raw/
+│   └── replay_buffer/
+├── models/
+│   ├── checkpoints/
+│   └── configs/
+│       └── data_kaggle.yaml
+├── runs/
+├── src/
+│   ├── analytics/
+│   │   ├── heatmap.py
+│   │   ├── ocr.py
+│   │   ├── product_identifier.py
+│   │   └── shelf_share.py
+│   ├── anomaly/
+│   │   ├── ml_detector.py
+│   │   └── rules.py
+│   ├── continual_learning/
+│   │   ├── active_learning.py
+│   │   ├── ewc.py
+│   │   ├── replay_buffer.py
+│   │   └── trainer.py
+│   ├── detection/
+│   │   ├── counter.py
+│   │   ├── detector.py
+│   │   └── train.py
+│   └── utils/
+│       ├── image_utils.py
+│       └── prepare_dataset.py
+├── tests/
+│   ├── test_api.py
+│   ├── test_detector.py
+│   ├── test_identifier.py
+│   ├── test_model_accuracy.py
+│   └── evaluate.py
+└── yolo26n.pt, yolov8n.pt, yolov8s.pt
+```
+
+> Note: `models/checkpoints/best.pt` is the checked-in production checkpoint. Training artifacts under `models/checkpoints/train/` are generated and are ignored by Git.
 
 ---
 
 ## Quickstart (without Docker)
 
-### 1. Install dependencies
+### 1. Create a virtual environment and install dependencies
+
 ```bash
 python -m venv venv
-# macOS / Linux:
-source venv/bin/activate
-# Windows:
+# Windows (PowerShell)
+.\venv\Scripts\Activate.ps1
+# Windows (Command Prompt)
 # .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Download SKU-110K
-Download from: https://drive.google.com/file/d/1iq93lCdhaPUN0fWbLieMtzfB1850pKwd
+### 2. Prepare the dataset
 
-Extract so your structure looks like:
-```
+The project can use either a raw SKU-110K CSV export or a Kaggle-style YOLO export.
+
+#### Option A — Raw SKU-110K CSV
+
+Download the SKU-110K dataset, then extract it so the folder structure is:
+
+```text
 data/raw/
-    images/
-        train/   ← .jpg files
-        val/     ← .jpg files
-    annotations/
-        annotations_train.csv
-        annotations_val.csv
+├── images/
+│   ├── train/
+│   └── val/
+└── annotations/
+    ├── annotations_train.csv
+    └── annotations_val.csv
 ```
 
-### 3. Prepare dataset
+Then run:
+
 ```bash
 python -m src.utils.prepare_dataset
 ```
-This converts SKU-110K CSV annotations into YOLOv8 format.
-The number of images is controlled by `config.py` → `SUBSET_SIZE`.
 
-### 4. Train
+#### Option B — Kaggle-style YOLO export
+
+If you already have a folder such as `SKU110K_fixed`, the preparation script will detect it automatically and write `models/configs/data_kaggle.yaml` for you.
+
+### 3. Train the model
+
 ```bash
 python -m src.detection.train
 ```
-The project auto-selects the best available device backend in `config.py`: `cuda`, `mps`, or `cpu`.
-On CPU, training can be slow; lower `EPOCHS`, `SUBSET_SIZE`, or `BATCH_SIZE` for a quick test.
 
-### 5. Test detection
+This uses the settings in `config.py`:
+- `MODEL_NAME` (default: `yolov8s.pt`)
+- `EPOCHS` (default: `30`)
+- `BATCH_SIZE` (default: `8`)
+- `IMG_SIZE` (default: `640`)
+- `DEVICE` (auto-selects `cuda`, `mps`, or `cpu`)
+
+### 4. Test inference on a single image
+
 ```bash
 python -m src.detection.detector --image path/to/shelf.jpg --output output.jpg
 ```
 
-### 6. Run tests
-```bash
-pytest tests/test_detector.py -v
-```
+The detector uses `models/checkpoints/best.pt` by default unless you pass `--weights`.
 
-### 7. Start API
+### 5. Start the API
+
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Open http://localhost:8000/docs for Swagger UI.
 
-### 8. Start dashboard
+Open http://localhost:8000/docs for the Swagger UI.
+
+### 6. Start the dashboard
+
 ```bash
 streamlit run dashboard/app.py
 ```
-Open http://localhost:8501
+
+The dashboard expects the API to be running on http://localhost:8000.
+
+### 7. Run the test suite
+
+```bash
+pytest tests/ -v
+```
+
+If you only want the detector checks:
+
+```bash
+pytest tests/test_detector.py -v
+```
 
 ---
 
@@ -87,43 +173,71 @@ Open http://localhost:8501
 docker compose up --build
 ```
 
+Then open:
 - Dashboard: http://localhost:8501
-- API docs:  http://localhost:8000/docs
+- API docs: http://localhost:8000/docs
+
+The compose file mounts `data/` and `models/` so trained artifacts persist across restarts.
+
+---
+
+## Configuration
+
+`config.py` is the source of truth for all tunable settings.
+
+| Setting | Current default | What it does |
+|---------|-----------------|--------------|
+| `SUBSET_SIZE` | `None` | Uses all available images unless you set a limit |
+| `EPOCHS` | `30` | Training epochs |
+| `BATCH_SIZE` | `8` | Batch size for training |
+| `IMG_SIZE` | `640` | Input resolution for YOLO training and inference |
+| `CONFIDENCE_THRESHOLD` | `0.35` | Minimum confidence to keep a detection |
+| `EMPTY_SHELF_MAX_PRODUCTS` | `2` | Triggers the empty-shelf anomaly |
+| `LOW_STOCK_MAX_PRODUCTS` | `5` | Triggers the low-stock anomaly |
+| `REPLAY_BUFFER_MAX_SIZE` | `200` | Maximum replay samples stored |
+| `REPLAY_SAMPLE_SIZE` | `50` | Replay samples used in each continual-learning round |
+| `CL_EPOCHS` | `10` | Fine-tuning epochs for incremental learning |
+| `DEVICE` | auto-selected | Uses `cuda`, `mps`, or `cpu` based on the local runtime |
+
+The dataset YAML path is `models/configs/data_kaggle.yaml`.
 
 ---
 
 ## GPU and accelerator support
 
-This project supports multiple device backends:
-- `cuda` for NVIDIA GPUs
-- `mps` for Apple silicon
-- `cpu` as a fallback when no GPU backend is available
+This project supports these backends:
 
-The backend is auto-selected in `config.py` using the available PyTorch runtime.
-If you want to force a specific device, update `DEVICE` in `config.py`.
+- `cuda` for NVIDIA GPUs
+- `mps` for Apple Silicon
+- `cpu` as the fallback
+
+`config.py` auto-selects the available backend at runtime. To force a backend, set `DEVICE` explicitly in `config.py`.
 
 ---
 
 ## Continual learning workflow
 
 ```bash
-# Step 1: Train initial model (Phase 1)
+# 1. Train the base model
 python -m src.detection.train
 
-# Step 2: Seed replay buffer with Phase 1 samples
+# 2. Seed the replay buffer with phase-1 samples
 python -c "
 from src.continual_learning.trainer import IncrementalTrainer
-t = IncrementalTrainer()
-t.seed_buffer_from_phase(phase=1)
+trainer = IncrementalTrainer()
+trainer.seed_buffer_from_phase(phase=1)
 "
 
-# Step 3: When new product images arrive (Phase 2)
-# Put them in:  data/phase2/images/  and  data/phase2/labels/
-# Then run:
+# 3. Add new phase data in YOLO format
+# Put the images and labels in:
+#   data/phase2/images/
+#   data/phase2/labels/
+
+# 4. Fine-tune on the new phase while replaying old samples
 python -c "
 from src.continual_learning.trainer import IncrementalTrainer
-t = IncrementalTrainer()
-t.train_new_phase(
+trainer = IncrementalTrainer()
+trainer.train_new_phase(
     new_images_dir='data/phase2/images',
     new_labels_dir='data/phase2/labels',
     class_names=['product'],
@@ -131,103 +245,44 @@ t.train_new_phase(
 )
 "
 
-# Step 4: Measure forgetting
+# 5. Compare before / after forgetting metrics
 python tests/evaluate.py \
     --before models/checkpoints/phase1_best.pt \
-    --after  models/checkpoints/best.pt
+    --after models/checkpoints/best.pt
 ```
-
----
-
-## Project structure
-
-```
-retail-shelf-intelligence/
-├── config.py                          ← all settings in one place
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-│
-├── data/
-│   ├── raw/                           ← SKU-110K download goes here
-│   ├── processed/                     ← YOLOv8-format dataset
-│   └── replay_buffer/                 ← old training samples
-│
-├── models/
-│   ├── checkpoints/best.pt            ← trained weights
-│   └── configs/sku110k.yaml           ← dataset YAML
-│
-├── src/
-│   ├── detection/
-│   │   ├── detector.py                ← YOLOv8 inference wrapper
-│   │   ├── counter.py                 ← product counting + zone stats
-│   │   └── train.py                   ← training script
-│   ├── anomaly/
-│   │   └── rules.py                   ← rule-based anomaly detection
-│   ├── continual_learning/
-│   │   ├── replay_buffer.py           ← experience replay storage
-│   │   └── trainer.py                 ← incremental fine-tuning
-│   └── utils/
-│       ├── image_utils.py             ← shared image helpers
-│       └── prepare_dataset.py         ← SKU-110K → YOLOv8 converter
-│
-├── api/
-│   └── main.py                        ← FastAPI app
-├── dashboard/
-│   └── app.py                         ← Streamlit dashboard
-└── tests/
-    ├── test_detector.py               ← pytest test suite
-    └── evaluate.py                    ← mAP + forgetting metrics
-```
-
----
-
-## Configuration
-
-All tunable parameters live in `config.py`. The important ones:
-
-| Parameter | Default | What it does |
-|-----------|---------|--------------|
-| SUBSET_SIZE | 100 | How many images to use from SKU-110K |
-| EPOCHS | 10 | Training epochs (lower for faster testing) |
-| BATCH_SIZE | 4 | Lower to 1 or 2 if you get out-of-memory errors on small GPUs |
-| CONFIDENCE_THRESHOLD | 0.35 | Minimum detection confidence |
-| EMPTY_SHELF_MAX_PRODUCTS | 2 | Zone product count to trigger "empty" alert |
-| LOW_STOCK_MAX_PRODUCTS | 5 | Zone product count to trigger "low stock" alert |
-| REPLAY_BUFFER_MAX_SIZE | 200 | Max samples stored in replay buffer |
-| REPLAY_SAMPLE_SIZE | 50 | Old samples mixed in per fine-tuning round |
-| CL_EPOCHS | 10 | Fine-tuning epochs per continual learning phase |
 
 ---
 
 ## Common errors
 
 **`ModuleNotFoundError: No module named 'ultralytics'`**
-Run `pip install -r requirements.txt` inside your virtualenv.
+Run `pip install -r requirements.txt`.
 
 **`Dataset YAML not found`**
-Run `python -m src.utils.prepare_dataset` first.
+Run `python -m src.utils.prepare_dataset` first. The script also detects a Kaggle-style export automatically.
 
 **`No images found in train set`**
-Check that SKU-110K is extracted to `data/raw/` and that your CSV filenames match the image filenames exactly.
+Check that the raw files live under `data/raw/images/` and that the annotation filenames match the image filenames.
 
 **`OOM / killed during training`**
-Lower `BATCH_SIZE` to 4 or `IMG_SIZE` to 416 in config.py.
+Lower `BATCH_SIZE` or `IMG_SIZE` in `config.py`.
 
-**`API connection refused` in dashboard**
-Start the API first: `uvicorn api.main:app --port 8000`
-Or run the dashboard in standalone mode: `streamlit run dashboard/app.py -- --standalone`
+**`API connection refused` in the dashboard**
+Start the API first with `uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload`.
+The dashboard does not run standalone in this repo; it expects the API to be available.
 
-**Training is too slow on CPU**
-Set `EPOCHS = 5`, `SUBSET_SIZE = 100`, and `BATCH_SIZE = 4` for a quick demo. The model won't be accurate but the pipeline will work end-to-end.
+**`Training is too slow on CPU`**
+Lower `EPOCHS` and `BATCH_SIZE` for a fast smoke test. The current defaults are tuned for stronger accuracy.
 
 ---
 
-## Evaluation metrics explained
+## Evaluation metrics
 
-- **mAP50**: mean Average Precision at IoU=0.50. Main metric. Target: >0.5 on SKU-110K subset.
-- **mAP50-95**: stricter version averaged across IoU thresholds. Lower, normal.
-- **Forgetting score**: mAP drop on old classes after fine-tuning new ones. Target: <0.02 with replay buffer active.
+- **mAP50** — main metric for detection quality.
+- **mAP50-95** — stricter IoU-averaged metric.
+- **Forgetting score** — degradation on older classes after incremental fine-tuning.
+
+A good target for the replay-buffer workflow is to keep forgetting small while maintaining good accuracy on new data.
 
 ---
 
@@ -235,10 +290,11 @@ Set `EPOCHS = 5`, `SUBSET_SIZE = 100`, and `BATCH_SIZE = 4` for a quick demo. Th
 
 | Layer | Library |
 |-------|---------|
-| Detection | YOLOv8n (Ultralytics) |
+| Detection | YOLOv8 (Ultralytics) |
 | Training | PyTorch |
 | Image processing | OpenCV, Pillow |
 | API | FastAPI + Uvicorn |
 | Dashboard | Streamlit + Plotly |
+| OCR / identification | EasyOCR |
 | Containerisation | Docker + Compose |
 | Tests | pytest |
